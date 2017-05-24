@@ -25,7 +25,7 @@ func NewTopic(topicName string) *Topic {
 		Name:              topicName,
 		inBoundMidlewares: make(map[Filter]bool),
 		consumers:         make(map[string]CallFunc),
-		dispatcher:        mailbox.NewDefaultDispatcher(5),
+		dispatcher:        mailbox.NewDispatcher(5),
 	}
 	topic.mailbox = mailbox.New(1000, topic, topic.dispatcher)
 	return topic

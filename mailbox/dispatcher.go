@@ -15,6 +15,6 @@ func (d goroutineDispatcher) Throughput() int {
 	return int(d)
 }
 
-func NewDefaultDispatcher(throughput int) Dispatcher {
+func NewDispatcher(throughput int) Dispatcher {
 	return goroutineDispatcher(throughput)
 }

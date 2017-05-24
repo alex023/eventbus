@@ -18,7 +18,7 @@ func (mq *Queue) Push(item interface{}) {
 	mq.queue.Put(item)
 }
 
-func BoundQueue(size uint64) *Queue {
+func boundQueue(size uint64) *Queue {
 	return &Queue{
 		queue: queue.NewRingBuffer(size),
 	}

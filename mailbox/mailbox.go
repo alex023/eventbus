@@ -11,7 +11,7 @@ const (
 	_RUNNING
 )
 
-// The Mailbox interface is used to enqueue userMessages to the mailbox
+// The Mailbox interface is used to enqueue messages to the mailbox
 type Mailbox interface {
 	PostUserMessage(message interface{})
 	PostCmdMessage(message interface{})
@@ -42,8 +42,21 @@ func (mailbox *defaultMailbox) PostUserMessage(message interface{}) {
 
 func (mailbox *defaultMailbox) schedule() {
 	if atomic.CompareAndSwapInt32(&mailbox.scheduleStatus, _IDLE, _RUNNING) {
-		mailbox.run()
-		atomic.StoreInt32(&mailbox.scheduleStatus, _IDLE)
+		mailbox.dispatcher.Schedule(mailbox.processMsg)
+	}
+}
+func (mailbox *defaultMailbox) processMsg() {
+process_start:
+	mailbox.run()
+	atomic.StoreInt32(&mailbox.scheduleStatus, _IDLE)
+
+	// check if there are still messages to process (sent after the message loop ended)
+	user := atomic.LoadInt32(&mailbox.userMessages)
+	cmd := atomic.LoadInt32(&mailbox.cmdMessages)
+	if cmd > 0 || user > 0 {
+		if atomic.CompareAndSwapInt32(&mailbox.scheduleStatus, _IDLE, _RUNNING) {
+			goto process_start
+		}
 	}
 }
 func (mailbox *defaultMailbox) run() {
@@ -61,9 +74,11 @@ func (mailbox *defaultMailbox) run() {
 			runtime.Gosched()
 		}
 		i++
+
 		if msg = mailbox.cmdMessage.Pop(); msg != nil {
 			atomic.AddInt32(&mailbox.cmdMessages, -1)
 			mailbox.invoker.ReceiveCmdMessage(msg)
+			//Prioritize the cmdmessage
 			continue
 		}
 
@@ -81,8 +96,8 @@ func (mailbox *defaultMailbox) Start() {
 }
 func New(size uint64, invoker Invoker, dispatcher Dispatcher) Mailbox {
 	return &defaultMailbox{
-		userMessage: BoundQueue(size),
-		cmdMessage:  BoundQueue(5),
+		userMessage: boundQueue(size),
+		cmdMessage:  boundQueue(100),
 		invoker:     invoker,
 		dispatcher:  dispatcher,
 	}
