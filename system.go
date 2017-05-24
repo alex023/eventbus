@@ -2,40 +2,50 @@
 package eventbus
 
 import (
+	"errors"
 	"sync"
 	"sync/atomic"
 )
 
+var (
+	ErrUnvaliableTopic = errors.New("unvaliable topic.")
+	ErrClosed          = errors.New("closed eventbus.")
+)
+
 type CallFunc func(message interface{})
-type subscribe struct {
-	topic    string
-	clientId string
-	callFunc func(msg interface{})
+
+type cmdSubscribe struct {
+	topic      string
+	ConsumerId string
+	callFunc   func(msg interface{})
 }
 
-type unsubscribe struct {
-	topic    string
-	clientId string
+type cmdUnsubscribe struct {
+	topic      string
+	ConsumerId string
 }
 
-type loadMiddleware struct {
+type cmdLoadMiddleware struct {
 	topic      string
 	middleWare Filter
 }
-type unloadMiddleware struct {
+type cmdUnloadMiddleware struct {
 	topic      string
 	middleWare Filter
 }
-type addConsumer struct {
-	topic    string
-	id       string
-	callFunc func(message interface{})
+type cmdAddConsumer struct {
+	topic      string
+	ConsumerId string
+	callFunc   func(message interface{})
 }
-type removeConsumer struct {
+type cmdRmConsumer struct {
 	topic string
 	id    string
 }
 
+type cmdStop struct{
+
+}
 // Bus is a  subscription service module
 type Bus struct {
 	rwmut sync.RWMutex
@@ -65,10 +75,10 @@ func (s *Bus) Subscribe(topic, clientID string, callFunc CallFunc) {
 	s.rwmut.RUnlock()
 	if !found {
 		ch := NewTopic(topic)
-		msg := addConsumer{
-			topic:    topic,
-			id:       clientID,
-			callFunc: callFunc,
+		msg := cmdAddConsumer{
+			topic:      topic,
+			ConsumerId: clientID,
+			callFunc:   callFunc,
 		}
 		ch.PostCmdMessage(msg)
 
@@ -76,18 +86,17 @@ func (s *Bus) Subscribe(topic, clientID string, callFunc CallFunc) {
 		s.dict[topic] = ch
 		s.rwmut.Unlock()
 	} else {
-		msg := addConsumer{
-			topic:    topic,
-			id:       clientID,
-			callFunc: callFunc,
+		msg := cmdAddConsumer{
+			topic:      topic,
+			ConsumerId: clientID,
+			callFunc:   callFunc,
 		}
 		ch.PostUserMessage(msg)
 	}
 }
 
-//Unsubscribe 取消订阅。由于内部使用了waitgroup，在使用时，要特别小心：
-//	1.订阅某个主题的handle，其内部不得直接调用Unsubscribe来注销同一主题。否则，如果该主题正好只有最后一个client，就会被阻塞。
-//	2.如果确实需要，请加入：关键字 go。
+//Unsubscribe 取消订阅。
+//	因为采用异步消息，可以在订阅的消息handule中调用Unsubscribe来注销该主题。
 func (s *Bus) Unsubscribe(topicName string, clientID string) {
 	ch, found := s.dict[topicName]
 
@@ -100,18 +109,19 @@ func (s *Bus) Unsubscribe(topicName string, clientID string) {
 }
 
 // PostUserMessage asynchronous push a messageEnvelop
-func (s *Bus) Publish(topic string, m interface{}) {
+func (s *Bus) Publish(topic string, m interface{}) error {
 	if atomic.LoadInt32(&s.exitFlag) == 1 {
-		return
+		return ErrClosed
 	}
 	s.rwmut.RLock()
 	ch, found := s.dict[topic]
 	s.rwmut.RUnlock()
 	if !found {
-		return
+		return ErrUnvaliableTopic
 	}
 	ch.PostUserMessage(m)
 	atomic.AddUint64(&s.msgCount, 1)
+	return nil
 }
 
 func (s *Bus) LoadMiddle(topic string, ware Filter) {
@@ -121,7 +131,7 @@ func (s *Bus) LoadMiddle(topic string, ware Filter) {
 	if !found {
 		return
 	}
-	ch.PostCmdMessage(loadMiddleware{
+	ch.PostCmdMessage(cmdLoadMiddleware{
 		topic:      topic,
 		middleWare: ware,
 	})
@@ -134,7 +144,7 @@ func (s *Bus) UnloadMiddle(topic string, ware Filter) {
 	if !found {
 		return
 	}
-	ch.PostCmdMessage(unloadMiddleware{
+	ch.PostCmdMessage(cmdUnloadMiddleware{
 		topic:      topic,
 		middleWare: ware})
 }
@@ -144,12 +154,17 @@ func (s *Bus) Exiting() bool {
 	return atomic.LoadInt32(&s.exitFlag) == 1
 }
 
-// Close safe exit eventbus
-func (s *Bus) Close() {
+// Stop immediately stop the execution of eventbus ,dropping all unreceived msg in topic mailbox
+func (s *Bus) Stop() {
 	if atomic.CompareAndSwapInt32(&s.exitFlag, 0, 1) {
 		//close(s.msgCache)
 		//s.wg.Wait()
 	}
+}
+
+//StopGracefull stop eventbus until all messages are received by the consumer
+func (s Bus) StopGracefull() {
+	//todo
 }
 
 //GetTopics performs a thread safe operation to get all topics in subscription service module

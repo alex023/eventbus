@@ -15,7 +15,7 @@ type Topic struct {
 	consumers         map[string]CallFunc
 	inBoundMidlewares map[Filter]bool
 	msgCount          uint64
-	exitFlag          int32
+	closeFlag         int32
 	dispatcher        mailbox.Dispatcher
 }
 
@@ -76,16 +76,20 @@ func (topic *Topic) ReceiveUserMessage(message interface{}) {
 }
 func (topic *Topic) ReceiveCmdMessage(message interface{}) {
 	switch msg := message.(type) {
-	case unsubscribe:
-	case subscribe:
-	case loadMiddleware:
+	case cmdSubscribe:
+		topic.addConsumer(msg.ConsumerId,msg.callFunc)
+	case cmdUnsubscribe:
+		topic.rmConsumer(msg.ConsumerId)
+	case cmdLoadMiddleware:
 		topic.inBoundMidlewares[msg.middleWare] = true
-	case unloadMiddleware:
+	case cmdUnloadMiddleware:
 		delete(topic.inBoundMidlewares, msg.middleWare)
-	case addConsumer:
-		topic.addConsumer(msg.id, msg.callFunc)
-	case removeConsumer:
+	case cmdAddConsumer:
+		topic.addConsumer(msg.ConsumerId, msg.callFunc)
+	case cmdRmConsumer:
 		topic.rmConsumer(msg.id)
+	case cmdStop:
+		atomic.StoreInt32(&topic.closeFlag,1)
 	default:
 		fmt.Printf("[topic %v] receive undefined msg type:%v!\n", topic.Name, reflect.TypeOf(msg))
 
@@ -94,7 +98,7 @@ func (topic *Topic) ReceiveCmdMessage(message interface{}) {
 
 // Close close mc topic until all messages have been sent to the registered client.
 func (topic *Topic) Close() {
-	if !atomic.CompareAndSwapInt32(&topic.exitFlag, 0, 1) {
+	if !atomic.CompareAndSwapInt32(&topic.closeFlag, 0, 1) {
 		return
 	}
 	//等待正在执行的广播消息完成，通过wait确保注册方法的执行

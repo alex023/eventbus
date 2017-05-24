@@ -5,7 +5,8 @@ import "github.com/Workiva/go-datastructures/queue"
 type Queue struct {
 	queue *queue.RingBuffer
 }
-
+//Pop get interface{} from queue
+// This call will easy  blocked, if the queue is empty ,when multi goroutines
 func (mq *Queue) Pop() interface{} {
 	if mq.queue.Len() > 0 {
 		item, _ := mq.queue.Get()
@@ -18,8 +19,8 @@ func (mq *Queue) Push(item interface{}) {
 	mq.queue.Put(item)
 }
 
-func boundQueue(size uint64) *Queue {
+func boundQueue(buffer uint64) *Queue {
 	return &Queue{
-		queue: queue.NewRingBuffer(size),
+		queue: queue.NewRingBuffer(buffer),
 	}
 }
