@@ -9,8 +9,7 @@ import (
 type CountMessage struct {
 	X, Y int
 }
-type Pubslisher struct {
-}
+
 type Consumer struct {
 	testNilMap map[int32]struct{}
 }
@@ -20,7 +19,8 @@ func (c *Consumer) Add(message interface{}) {
 	if !ok {
 		return
 	}
-	if cMsg.X == 95 {
+	//当输入值 %5==0时，故意向nil map 插入值导致崩溃
+	if cMsg.X%5 == 0 {
 		c.testNilMap[2] = struct{}{}
 	} else {
 		fmt.Printf("result:=%v + %v = %v \n", cMsg.X, cMsg.Y, cMsg.X+cMsg.Y)
@@ -28,6 +28,7 @@ func (c *Consumer) Add(message interface{}) {
 	}
 }
 
+//此代码演示消费者订阅，且在某特殊情况下崩溃，系统对其的处理！
 func main() {
 	eb := eventbus.New()
 	consumer := &Consumer{}

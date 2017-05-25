@@ -7,9 +7,14 @@ import (
 	"sync/atomic"
 )
 
+const (
+	_CLOSED  = 1
+	_RUNNING = 0
+)
+
 var (
-	ErrUnvaliableTopic = errors.New("unvaliable topic.")
-	ErrClosed          = errors.New("closed eventbus.")
+	ErrUnvaliableTopic = errors.New("topic unvaliable.")
+	ErrClosed          = errors.New("eventbus closed.")
 )
 
 type CallFunc func(message interface{})
@@ -25,13 +30,13 @@ type cmdUnsubscribe struct {
 	ConsumerId string
 }
 
-type cmdLoadMiddleware struct {
-	topic      string
-	middleWare Filter
+type cmdLoadFilter struct {
+	topic  string
+	filter Filter
 }
-type cmdUnloadMiddleware struct {
-	topic      string
-	middleWare Filter
+type cmdUnloadFilter struct {
+	topic  string
+	filter Filter
 }
 type cmdAddConsumer struct {
 	topic      string
@@ -43,135 +48,154 @@ type cmdRmConsumer struct {
 	id    string
 }
 
-type cmdStop struct{
-
+type cmdStop struct {
 }
+type cmdStopGracefull struct {
+	wg *sync.WaitGroup
+}
+
 // Bus is a  subscription service module
 type Bus struct {
-	rwmut sync.RWMutex
-	dict  map[string]*Topic //map[topic.Name]*Channel
-	//wg       basekit.WaitWraper
+	rwmut    sync.RWMutex
+	topics   map[string]*Topic //map[topic.Name]*Channel
 	msgCount uint64
-	exitFlag int32
+	stopFlag int32
 }
 
 // New create a eventbus
 func New() *Bus {
 	bus := &Bus{
-		dict: make(map[string]*Topic),
-		//msgCache: make(chan *messageEnvelop, 1000),
+		topics: make(map[string]*Topic),
 	}
-	//bus.p = NewProcess(bus)
-
-	//bus.wg.Wrap(func() { bus.popMsg() })
 	return bus
 }
 
 //Subscribe 订阅主题，要确保输入的clientId唯一，避免不同客户端注册的时候采用同样的ClientId，否则会被替换。
+func (s *Bus) Subscribe(topicName, clientId string, callFn CallFunc) error {
+	if atomic.LoadInt32(&s.stopFlag) == _CLOSED {
+		return ErrClosed
+	}
 
-func (s *Bus) Subscribe(topic, clientID string, callFunc CallFunc) {
 	s.rwmut.RLock()
-	ch, found := s.dict[topic]
+	ch, found := s.topics[topicName]
 	s.rwmut.RUnlock()
 	if !found {
-		ch := NewTopic(topic)
-		msg := cmdAddConsumer{
-			topic:      topic,
-			ConsumerId: clientID,
-			callFunc:   callFunc,
-		}
-		ch.PostCmdMessage(msg)
-
+		ch = NewTopic(topicName)
 		s.rwmut.Lock()
-		s.dict[topic] = ch
+		s.topics[topicName] = ch
 		s.rwmut.Unlock()
-	} else {
-		msg := cmdAddConsumer{
-			topic:      topic,
-			ConsumerId: clientID,
-			callFunc:   callFunc,
-		}
-		ch.PostUserMessage(msg)
 	}
+	msg := cmdAddConsumer{
+		topic:      topicName,
+		ConsumerId: clientId,
+		callFunc:   callFn,
+	}
+	ch.PostCmdMessage(msg)
+	return nil
 }
 
 //Unsubscribe 取消订阅。
 //	因为采用异步消息，可以在订阅的消息handule中调用Unsubscribe来注销该主题。
-func (s *Bus) Unsubscribe(topicName string, clientID string) {
-	ch, found := s.dict[topicName]
+func (s *Bus) Unsubscribe(topicName string, clientId string) error {
+	if atomic.LoadInt32(&s.stopFlag) == _CLOSED {
+		return ErrClosed
+	}
+
+	ch, found := s.topics[topicName]
 
 	if found {
-		if ch.rmConsumer(clientID) == 0 {
+		if ch.rmConsumer(clientId) == 0 {
 			ch.Close()
-			delete(s.dict, topicName)
+			delete(s.topics, topicName)
 		}
 	}
+	return nil
 }
 
 // PostUserMessage asynchronous push a messageEnvelop
-func (s *Bus) Publish(topic string, m interface{}) error {
-	if atomic.LoadInt32(&s.exitFlag) == 1 {
+func (s *Bus) Publish(topicName string, message interface{}) error {
+	if atomic.LoadInt32(&s.stopFlag) == _CLOSED {
 		return ErrClosed
 	}
+
 	s.rwmut.RLock()
-	ch, found := s.dict[topic]
+	ch, found := s.topics[topicName]
 	s.rwmut.RUnlock()
 	if !found {
 		return ErrUnvaliableTopic
 	}
-	ch.PostUserMessage(m)
+
+	ch.PostUserMessage(message)
 	atomic.AddUint64(&s.msgCount, 1)
 	return nil
 }
 
-func (s *Bus) LoadMiddle(topic string, ware Filter) {
+func (s *Bus) LoadFilter(topic string, filter Filter) error {
+	if atomic.LoadInt32(&s.stopFlag) == _CLOSED {
+		return ErrClosed
+	}
+
 	s.rwmut.RLock()
-	ch, found := s.dict[topic]
+	ch, found := s.topics[topic]
 	s.rwmut.RUnlock()
 	if !found {
-		return
+		return ErrUnvaliableTopic
 	}
-	ch.PostCmdMessage(cmdLoadMiddleware{
-		topic:      topic,
-		middleWare: ware,
+
+	ch.PostCmdMessage(cmdLoadFilter{
+		topic:  topic,
+		filter: filter,
 	})
+	return nil
 }
 
-func (s *Bus) UnloadMiddle(topic string, ware Filter) {
+func (s *Bus) UnloadFilter(topic string, ware Filter) error {
+	if atomic.LoadInt32(&s.stopFlag) == _CLOSED {
+		return ErrClosed
+	}
+
 	s.rwmut.RLock()
-	ch, found := s.dict[topic]
+	ch, found := s.topics[topic]
 	s.rwmut.RUnlock()
 	if !found {
-		return
+		return ErrUnvaliableTopic
 	}
-	ch.PostCmdMessage(cmdUnloadMiddleware{
-		topic:      topic,
-		middleWare: ware})
-}
+	ch.PostCmdMessage(cmdUnloadFilter{
+		topic:  topic,
+		filter: ware})
 
-// Exiting returns a boolean indicating if topic is closed/exiting
-func (s *Bus) Exiting() bool {
-	return atomic.LoadInt32(&s.exitFlag) == 1
+	return nil
 }
 
 // Stop immediately stop the execution of eventbus ,dropping all unreceived msg in topic mailbox
 func (s *Bus) Stop() {
-	if atomic.CompareAndSwapInt32(&s.exitFlag, 0, 1) {
+	if atomic.CompareAndSwapInt32(&s.stopFlag, _RUNNING, _CLOSED) {
 		//close(s.msgCache)
 		//s.wg.Wait()
 	}
 }
 
-//StopGracefull stop eventbus until all messages are received by the consumer
+//StopGracefull block for stoping eventbus until all messages are received by the consumer
 func (s Bus) StopGracefull() {
-	//todo
+	if atomic.CompareAndSwapInt32(&s.stopFlag, _RUNNING, _CLOSED) {
+		wg := &sync.WaitGroup{}
+		wg.Add(len(s.topics))
+
+		cmdMsg := cmdStopGracefull{
+			wg: wg,
+		}
+		for _, ch := range s.topics {
+			ch.PostUserMessage(cmdMsg)
+		}
+		wg.Wait()
+	}
 }
 
 //GetTopics performs a thread safe operation to get all topics in subscription service module
 func (s *Bus) GetTopics() []string {
-	result := make([]string, len(s.dict))
+	result := make([]string, len(s.topics))
 	i := 0
-	for topic := range s.dict {
+	for topic := range s.topics {
 		result[i] = topic
 		i++
 	}

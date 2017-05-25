@@ -3,36 +3,82 @@ package main
 import (
 	"fmt"
 	"github.com/alex023/eventbus"
+	"math/rand"
+	"strconv"
 	"time"
 )
 
+type ResultChan struct {
+	signal chan int
+}
+
 type Consumer struct {
+	ID      string
 	counter int
 }
 
-const _COUNT_SIZE = 50000000
-
-func (c *Consumer) Count(msg interface{}) {
-	c.counter++
-	if c.counter == _COUNT_SIZE {
-		c.Info()
+func (c *Consumer) Count(message interface{}) {
+	switch msg := message.(type) {
+	case ResultChan:
+		msg.signal <- c.counter
+	default:
+		c.counter++
 	}
 }
-func (c *Consumer) Info() {
-	fmt.Printf("receive msg :%4.4f \n", float32(c.counter)/10000)
-}
+
+//此代码演示多消费者处理数据，系统的性能！
 func main() {
+	//init [topic_num]topic,and arrange [consumer_num] consumer per topic。
+	//send to [message_num] messages to every topic,should get 10*[message_num] messages。
+	//So，we can get similar QPS！
+	var (
+		message_num  = 50000000
+		topic_num    = 1000
+		consumer_num = 10
+	)
 	eb := eventbus.New()
-	consumer := &Consumer{}
-	eb.Subscribe("counter", "1", consumer.Count)
-	fmt.Println("sending 5000w message begin.......")
-	start := time.Now()
-	for i := 0; i < _COUNT_SIZE; i++ {
-		eb.Publish("counter", struct{}{})
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	resultChan := ResultChan{
+		signal: make(chan int, topic_num),
 	}
-	consumer.Info()
-	time.Sleep(time.Second)
-	end := time.Now()
 
+	//init 【topic_num】个主题，且为每个主题分配[consumer_num]个消费者
+	for i := 0; i < topic_num; i++ {
+		for j := 0; j < consumer_num; j++ {
+			consumer := Consumer{
+				ID: strconv.Itoa(i) + strconv.Itoa(j),
+			}
+			eb.Subscribe("subj"+strconv.Itoa(i), consumer.ID, consumer.Count)
+		}
+	}
+	fmt.Printf("sending  %vw messages begin.......\n", message_num/10000)
+
+	start := time.Now()
+	//transmit ADD (by struct{}{}) signal
+	for i := 0; i < message_num; i++ {
+		if err := eb.Publish("subj"+strconv.Itoa(r.Intn(topic_num)), struct{}{}); err != nil {
+			fmt.Println("publish err:", err)
+			break
+		}
+	}
+	//transmit EXIT (by ResultChan) signal
+	for i := 0; i < topic_num; i++ {
+		//NOTE:if transmit EXIT signal by other topic,it can be received before ADD ,and get uncorrect result
+		eb.Publish("subj"+strconv.Itoa(i), resultChan)
+	}
+	var count = 0
+	t := time.After(time.Second * 1)
+	for {
+		select {
+		case result := <-resultChan.signal:
+			count += result
+
+		case <-t:
+			goto OutLoop
+		}
+	}
+OutLoop:
+	end := time.Now()
+	fmt.Printf("receive %vw messages by all consumers. \n", count/10000)
 	fmt.Printf("spent：%2.0f seconds \n", end.Sub(start).Seconds())
 }

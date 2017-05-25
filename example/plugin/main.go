@@ -46,13 +46,14 @@ func (c *Consumer) Div(message interface{}) {
 	}
 }
 
+//此代码演插件对消息的处理，如何影响消息！
 func main() {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	eb := eventbus.New()
 	consumer := &Consumer{}
 	eb.Subscribe("add", "consumer", consumer.Div)
 	//加载针对某个主题的插件
-	eb.LoadMiddle("add", &DivisorJudgment{})
+	eb.LoadFilter("add", &DivisorJudgment{})
 	time.Sleep(time.Second)
 	fmt.Println("topics:", eb.GetTopics())
 	for i := 0; i < 100; i++ {
@@ -60,7 +61,7 @@ func main() {
 		eb.Publish("add", CountMessage{i, y})
 		//卸载插件
 		if i == 50 {
-			eb.UnloadMiddle("add", &DivisorJudgment{})
+			eb.UnloadFilter("add", &DivisorJudgment{})
 
 		}
 	}

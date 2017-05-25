@@ -8,9 +8,9 @@ import (
 
 const (
 	producer_num    = 1000
-	consumer_num    = 800
+	consumer_num    = 500
 	action_times    = 1000
-	action_duration = time.Second * 3
+	action_duration = time.Second
 )
 
 type producer struct {
@@ -45,19 +45,21 @@ type consumer struct {
 	count int
 }
 
-func (c *consumer) Action(timeout time.Duration, maxReceive int) {
-	t := time.After(timeout)
+func (c *consumer) Action(maxReceive int, duration time.Duration) {
+	t := time.After(duration)
 	for {
-		select {
-		case <-t:
-			return
-		default:
-			if msg := c.queue.Pop(); msg != nil {
-				c.count++
+		if msg := c.queue.Pop(); msg != nil {
+			c.count++
 
-				if c.count >= maxReceive {
-					return
-				}
+			if c.count >= maxReceive {
+				return
+			}
+		} else {
+			select {
+			case <-t:
+				return
+			default:
+				//omit this select
 			}
 		}
 	}
@@ -66,7 +68,7 @@ func (c *consumer) Count() int {
 	return c.count
 }
 
-func consumerForEach(consumers []consumer, queue *Queue, actionDuration time.Duration) {
+func consumerForEach(consumers []consumer, queue *Queue, duration time.Duration) {
 	for i := 0; i < len(consumers); i++ {
 		consumers[i].queue = queue
 	}
@@ -75,7 +77,7 @@ func consumerForEach(consumers []consumer, queue *Queue, actionDuration time.Dur
 	wg.Add(len(consumers))
 	for i := 0; i < len(consumers); i++ {
 		go func(i int) {
-			consumers[i].Action(actionDuration, action_times)
+			consumers[i].Action(action_times, duration)
 			wg.Done()
 		}(i)
 	}
@@ -97,14 +99,18 @@ func TestQueue_MulPushAndOnePop(t *testing.T) {
 	c := &consumer{
 		queue: queue,
 	}
-	c.Action(time.Second, producer_num*action_times)
+	c.Action(producer_num*action_times, action_duration)
 
 	if producer_num*action_times != c.Count() {
 		t.Errorf("should=%v,actual=%v\n", producer_num*action_times, c.Count())
 	}
 }
 
+//TestQueue_MulPushAndMulPop  just test multithread safty.
 func TestQueue_MulPushAndMulPop(t *testing.T) {
+	//Because [RingBuffer] feature:" A put on full or get on empty call will block until an item
+	// is put or retrieved.". So,[consumer_num] must less than [produce_num].
+
 	queue := boundQueue(1000)
 
 	ps := make([]producer, producer_num)
