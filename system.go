@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	_CLOSED  = 1
-	_RUNNING = 0
+	_RUNNING int32 = 0
+	_CLOSED        = 1
 )
 
 var (
@@ -49,6 +49,7 @@ type cmdRmConsumer struct {
 }
 
 type cmdStop struct {
+	wg *sync.WaitGroup
 }
 type cmdStopGracefull struct {
 	wg *sync.WaitGroup
@@ -170,8 +171,14 @@ func (s *Bus) UnloadFilter(topic string, ware Filter) error {
 // Stop immediately stop the execution of eventbus ,dropping all unreceived msg in topic mailbox
 func (s *Bus) Stop() {
 	if atomic.CompareAndSwapInt32(&s.stopFlag, _RUNNING, _CLOSED) {
-		//close(s.msgCache)
-		//s.wg.Wait()
+		wg := &sync.WaitGroup{}
+		wg.Add(len(s.topics))
+		cmdMsg := cmdStop{
+			wg: wg,
+		}
+		for _, ch := range s.topics {
+			ch.PostCmdMessage(cmdMsg)
+		}
 	}
 }
 
@@ -180,12 +187,11 @@ func (s Bus) StopGracefull() {
 	if atomic.CompareAndSwapInt32(&s.stopFlag, _RUNNING, _CLOSED) {
 		wg := &sync.WaitGroup{}
 		wg.Add(len(s.topics))
-
 		cmdMsg := cmdStopGracefull{
 			wg: wg,
 		}
 		for _, ch := range s.topics {
-			ch.PostUserMessage(cmdMsg)
+			ch.PostCmdMessage(cmdMsg)
 		}
 		wg.Wait()
 	}

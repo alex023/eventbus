@@ -7,15 +7,20 @@ import (
 )
 
 type SlowActor struct {
+	counter int
 }
 
 func (c *SlowActor) Action(message interface{}) {
-	time.Sleep(time.Second * 10)
+	c.counter++
+	fmt.Println("[SlowActor] count:", c.counter)
+	time.Sleep(time.Second * 2)
 }
 
 // 此代码演示eventbus的两种关闭方式！
 func main() {
 	stop()
+	time.Sleep(time.Second * 5)
+
 	stopGraceful()
 }
 
@@ -26,6 +31,7 @@ func stop() {
 
 	eb.Subscribe("sleep", "consumer", consumer.Action)
 	eb.Publish("sleep", struct{}{})
+	eb.Publish("sleep", struct{}{})
 	eb.Stop()
 }
 
@@ -35,6 +41,7 @@ func stopGraceful() {
 	consumer := &SlowActor{}
 
 	eb.Subscribe("sleep", "consumer", consumer.Action)
+	eb.Publish("sleep", struct{}{})
 	eb.Publish("sleep", struct{}{})
 	eb.StopGracefull()
 }
