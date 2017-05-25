@@ -48,7 +48,7 @@ func main() {
 			consumer := Consumer{
 				ID: strconv.Itoa(i) + strconv.Itoa(j),
 			}
-			eb.Subscribe("subj"+strconv.Itoa(i), consumer.ID, consumer.Count)
+			eb.Subscribe("subj"+strconv.Itoa(i), consumer.Count)
 		}
 	}
 	fmt.Printf("sending  %vw messages begin.......\n", message_num/10000)

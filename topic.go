@@ -12,7 +12,7 @@ type Topic struct {
 	Name      string
 	mailbox   mailbox.Mailbox
 	filters   map[Filter]bool
-	consumers map[string]CallFunc
+	consumers map[uint64]CallFunc
 	msgCount  uint64
 	closeFlag int32
 }
@@ -22,22 +22,22 @@ func NewTopic(topicName string) *Topic {
 	topic := &Topic{
 		Name:      topicName,
 		filters:   make(map[Filter]bool),
-		consumers: make(map[string]CallFunc),
+		consumers: make(map[uint64]CallFunc),
 	}
 	topic.mailbox = mailbox.New(1000, topic, mailbox.NewDispatcher(5))
 	return topic
 }
 
-func (topic *Topic) addConsumer(clientId string, callFunc CallFunc) {
-	topic.consumers[clientId] = callFunc
+func (topic *Topic) addConsumer(consumerSeq uint64, handler CallFunc) {
+	topic.consumers[consumerSeq] = handler
 }
 
 //rmConsumer remove callback function by assigned clientid
-func (topic *Topic) rmConsumer(clientId string) int {
+func (topic *Topic) rmConsumer(consumerSeq uint64) int {
 	ret := len(topic.consumers)
-	if _, founded := topic.consumers[clientId]; founded {
+	if _, founded := topic.consumers[consumerSeq]; founded {
 		if ret > 0 {
-			delete(topic.consumers, clientId)
+			delete(topic.consumers, consumerSeq)
 			ret--
 		}
 	}
@@ -61,13 +61,13 @@ func (topic *Topic) PostUserMessage(message interface{}) {
 //notifyConsumer 向订阅了Topic的client发送消息
 func (topic *Topic) notifyConsumer(message interface{}) {
 	//i, t := 0, topic.dispatcher.Throughput()
-	for _, client := range topic.consumers {
+	for _, handle := range topic.consumers {
 		//if i > t {
 		//	i = 0
 		//	runtime.Gosched()
 		//}
 		//i++
-		client(message)
+		handle(message)
 	}
 }
 func (topic *Topic) ReceiveUserMessage(message interface{}) {
@@ -88,18 +88,14 @@ func (topic *Topic) ReceiveUserMessage(message interface{}) {
 
 func (topic *Topic) ReceiveCmdMessage(message interface{}) {
 	switch msg := message.(type) {
-	case cmdSubscribe:
-		topic.addConsumer(msg.ConsumerId, msg.callFunc)
-	case cmdUnsubscribe:
-		topic.rmConsumer(msg.ConsumerId)
 	case cmdLoadFilter:
 		topic.filters[msg.filter] = true
 	case cmdUnloadFilter:
 		delete(topic.filters, msg.filter)
 	case cmdAddConsumer:
-		topic.addConsumer(msg.ConsumerId, msg.callFunc)
+		topic.addConsumer(msg.consumerSeq, msg.callFn)
 	case cmdRmConsumer:
-		topic.rmConsumer(msg.id)
+		topic.rmConsumer(msg.consumerSeq)
 	case cmdStop:
 		topic.Close()
 		msg.wg.Done()

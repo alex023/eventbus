@@ -51,7 +51,7 @@ func main() {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	eb := eventbus.New()
 	consumer := &Consumer{}
-	eb.Subscribe("add", "consumer", consumer.Div)
+	eb.Subscribe("add", consumer.Div)
 	//加载针对某个主题的插件
 	eb.LoadFilter("add", &DivisorJudgment{})
 	time.Sleep(time.Second)

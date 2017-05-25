@@ -63,7 +63,7 @@ func (mailbox *defaultMailbox) run() {
 	var msg interface{}
 	defer func() {
 		if err := recover(); err != nil {
-			fmt.Println("[EventBus] Recovering", "msg is ", msg, "Reson:", err)
+			fmt.Println("[EventBus] Recovering msg is ", msg, "Reson:", err)
 		}
 	}()
 

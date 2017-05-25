@@ -10,18 +10,13 @@ type CountMessage struct {
 	X, Y int
 }
 
-var (
-	eb       = eventbus.New()
-	topic    = "add"
-	clientId = "consumer"
-)
-
 type Consumer struct {
 	testNilMap map[int32]struct{}
 	counter    int
+	sub        *eventbus.Subscribe
 }
 
-func (c *Consumer) Add(message interface{}) {
+func (c *Consumer) HandleMessage(message interface{}) {
 	cMsg, ok := message.(CountMessage)
 	if !ok {
 		return
@@ -36,7 +31,7 @@ func (c *Consumer) Add(message interface{}) {
 	}
 
 	if c.counter == 99 {
-		eb.Unsubscribe(topic, clientId)
+		c.sub.Unscribe()
 	}
 }
 
@@ -44,18 +39,22 @@ func (c *Consumer) Add(message interface{}) {
 // 1.故障隔离
 // 2.内部取消订阅，这可以用于特殊情况下的状态切换
 func main() {
+	var (
+		eb    = eventbus.New()
+		topic = "add"
+	)
 	consumer := &Consumer{}
-	eb.Subscribe(topic, clientId, consumer.Add)
+	sub, _ := eb.Subscribe(topic, consumer.HandleMessage)
+	consumer.sub = sub
 	time.Sleep(time.Second)
-	fmt.Println("topics:", eb.GetTopics())
 	for i := 0; i < 100; i++ {
-		eb.Publish("add", CountMessage{i, i * 2})
+		eb.Publish(topic, CountMessage{i, i * 2})
 	}
 	time.Sleep(time.Second)
 
 	//those messages cannot received by consumer,because it unsubscribe this topic
 	for i := 100; i < 200; i++ {
-		eb.Publish("add", CountMessage{i, i * 2})
+		eb.Publish(topic, CountMessage{i, i * 2})
 	}
 
 	eb.StopGracefull()

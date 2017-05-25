@@ -19,15 +19,14 @@ var (
 
 type CallFunc func(message interface{})
 
-type cmdSubscribe struct {
-	topic      string
-	ConsumerId string
-	callFunc   func(msg interface{})
+type Subscribe struct {
+	bus   *Bus
+	topic string
+	id    uint64
 }
 
-type cmdUnsubscribe struct {
-	topic      string
-	ConsumerId string
+func (sub *Subscribe) Unscribe() {
+	sub.bus.unsubscribe(sub.topic, sub.id)
 }
 
 type cmdLoadFilter struct {
@@ -39,13 +38,12 @@ type cmdUnloadFilter struct {
 	filter Filter
 }
 type cmdAddConsumer struct {
-	topic      string
-	ConsumerId string
-	callFunc   func(message interface{})
+	topic       string
+	consumerSeq uint64
+	callFn      CallFunc
 }
 type cmdRmConsumer struct {
-	topic string
-	id    string
+	consumerSeq uint64
 }
 
 type cmdStop struct {
@@ -57,10 +55,11 @@ type cmdStopGracefull struct {
 
 // Bus is a  subscription service module
 type Bus struct {
-	rwmut    sync.RWMutex
-	topics   map[string]*Topic //map[topic.Name]*Channel
-	msgCount uint64
-	stopFlag int32
+	rwmut       sync.RWMutex
+	topics      map[string]*Topic //map[topic.Name]*Channel
+	msgCount    uint64
+	consumerSeq uint64
+	stopFlag    int32
 }
 
 // New create a eventbus
@@ -72,9 +71,9 @@ func New() *Bus {
 }
 
 //Subscribe 订阅主题，要确保输入的clientId唯一，避免不同客户端注册的时候采用同样的ClientId，否则会被替换。
-func (s *Bus) Subscribe(topicName, clientId string, callFn CallFunc) error {
+func (s *Bus) Subscribe(topicName string, handle CallFunc) (*Subscribe, error) {
 	if atomic.LoadInt32(&s.stopFlag) == _CLOSED {
-		return ErrClosed
+		return nil, ErrClosed
 	}
 
 	s.rwmut.RLock()
@@ -86,30 +85,31 @@ func (s *Bus) Subscribe(topicName, clientId string, callFn CallFunc) error {
 		s.topics[topicName] = ch
 		s.rwmut.Unlock()
 	}
+	seq := atomic.AddUint64(&s.consumerSeq, 1)
 	msg := cmdAddConsumer{
-		topic:      topicName,
-		ConsumerId: clientId,
-		callFunc:   callFn,
+		topic:       topicName,
+		consumerSeq: seq,
+		callFn:      handle,
 	}
 	ch.PostCmdMessage(msg)
-	return nil
+	return &Subscribe{topic: topicName, id: seq, bus: s}, nil
 }
 
-//Unsubscribe 取消订阅。
+//unsubscribe 取消订阅。
 //	因为采用异步消息，可以在订阅的消息handule中调用Unsubscribe来注销该主题。
-func (s *Bus) Unsubscribe(topicName string, clientId string) error {
+func (s *Bus) unsubscribe(topicName string, id uint64) error {
 	if atomic.LoadInt32(&s.stopFlag) == _CLOSED {
 		return ErrClosed
 	}
 
 	ch, found := s.topics[topicName]
-
-	if found {
-		if ch.rmConsumer(clientId) == 0 {
-			ch.Close()
-			delete(s.topics, topicName)
-		}
+	if !found {
+		return ErrUnvaliableTopic
 	}
+	msg := cmdRmConsumer{
+		consumerSeq: id,
+	}
+	ch.PostCmdMessage(msg)
 	return nil
 }
 
@@ -150,7 +150,7 @@ func (s *Bus) LoadFilter(topic string, filter Filter) error {
 	return nil
 }
 
-func (s *Bus) UnloadFilter(topic string, ware Filter) error {
+func (s *Bus) UnloadFilter(topic string, filter Filter) error {
 	if atomic.LoadInt32(&s.stopFlag) == _CLOSED {
 		return ErrClosed
 	}
@@ -161,9 +161,10 @@ func (s *Bus) UnloadFilter(topic string, ware Filter) error {
 	if !found {
 		return ErrUnvaliableTopic
 	}
+
 	ch.PostCmdMessage(cmdUnloadFilter{
 		topic:  topic,
-		filter: ware})
+		filter: filter})
 
 	return nil
 }
