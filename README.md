@@ -1,4 +1,6 @@
 # eventbus
+Eventbus is an enhanced version of the standalone pub-sub asynchronous messaging framework.
+
 [![License](https://img.shields.io/:license-apache-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Report Card](https://goreportcard.com/badge/github.com/alex023/eventbus)](https://goreportcard.com/report/github.com/alex023/eventbus)
 [![GoDoc](https://godoc.org/github.com/alex023/eventbus?status.svg)](https://godoc.org/github.com/alex023/eventbus)
@@ -6,8 +8,7 @@
 [![Coverage Status](https://coveralls.io/repos/github/alex023/eventbus/badge.svg?branch=dev)](https://coveralls.io/github/alex023/eventbus?branch=dev)
 
 ## Brief
-Eventbus is an enhanced version of the standalone pub-sub asynchronous messaging framework.
-消息系统在业务系统中，能够减少对象依赖，避免因为过多聚集、关联带来的维护困难等问题。但传统的publish-->Topic Call Consumers Handle的同步方式，会有以下个别限制：
+消息系统在业务系统中，能够减少对象依赖，避免因为过多聚集、关联带来的维护困难等问题。但传统的[publish Msg --> Call Consumers Handle]的同步方式，会有以下个别限制：
 - 当消费慢于推送，可能会阻塞等待。
 - 消费者无法向包含了自身对象（或方法）的主题推送消息。
 - 消费者基于消息更改自身的订阅状态时，可能死锁。
@@ -21,7 +22,7 @@ Eventbus is an enhanced version of the standalone pub-sub asynchronous messaging
     - 允许消费者向自己发布消息。
     - 推送快于消费时，具备一定的韧性。
 - 隔离业务崩溃
-- 面向主题插件支持，并可以：
+- 主题插件支持，以拦截、路由、记录、修改某个主题接受到的消息，并可以：
     - 任意时间添加或卸载（优先于一般消息）
     - [todo]实现消息接受、完成的动态监控
 
