@@ -1,4 +1,4 @@
-//package Eventbus is an enhanced version of the standalone pub-sub asynchronous messaging system.
+//package Eventbus is an enhanced version of the standalone pub-sub asynchronous messaging framework.
 // The system provides a large throughput of stand-alone message engine frameworks.
 // In addition to the general news subscription, the release of the functional support,
 // but also can be used for server-side ECS application scenarios. Has the following features:
