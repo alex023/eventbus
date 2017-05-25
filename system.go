@@ -199,11 +199,13 @@ func (s Bus) StopGracefull() {
 
 //GetTopics performs a thread safe operation to get all topics in subscription service module
 func (s *Bus) GetTopics() []string {
+	s.rwmut.RLock()
 	result := make([]string, len(s.topics))
 	i := 0
 	for topic := range s.topics {
 		result[i] = topic
 		i++
 	}
+	s.rwmut.RUnlock()
 	return result
 }
