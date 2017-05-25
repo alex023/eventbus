@@ -5,19 +5,32 @@
 [![Build Status](https://travis-ci.org/alex023/eventbus.svg?branch=dev)](https://travis-ci.org/alex023/eventbus?branch=dev)
 [![Coverage Status](https://coveralls.io/repos/github/alex023/eventbus/badge.svg?branch=dev)](https://coveralls.io/github/alex023/eventbus?branch=dev)
 
-
+## Brief
 Eventbus is an enhanced version of the standalone pub-sub asynchronous messaging framework.
+消息系统在业务系统中，能够减少对象依赖，避免因为过多聚集、关联带来的维护困难等问题。但传统的publish-->Topic Call Consumers Handle的同步方式，会有以下个别限制：
+- 当消费慢于推送，可能会阻塞等待。
+- 消费者无法向包含了自身对象（或方法）的主题推送消息。
+- 消费者基于消息更改自身的订阅状态时，可能死锁。
+- 在消费者获取消息前，无法进行消息预处理。
+- ……
 
-eventbus 是一个加强版的单机pub-sub异步消息框架。除了一般的消息订阅、发布的功能支持之外，
+面对这些问题，eventbus 基于actor的异步思想，来处理以上问题，除了最基本的消息推送、订阅功能支持之外，
  也适用于简单的ECS应用场景。具有以下特征：
-- 大吞吐量，不低于200wQPS
+- 消息的发布与消费隔离，且有缓冲，因此支持：
+    - 消息发布更快，不用等待消费者执行
+    - 允许消费者向自己发布消息。
+    - 推送快于消费时，具备一定的韧性。
 - 隔离业务崩溃
-- 主题[过滤器]支持,且可以在任意时间添加或卸载
-- [todo]考虑提供统计插件支持
+- 面向主题插件支持，并可以：
+    - 任意时间添加或卸载（优先于一般消息）
+    - [todo]实现消息接受、完成的动态监控
 
-基于该框架，可以将对象间的直接依赖改为消息通知，而避免因为过多聚集、关联带来的维护困难、对象释放不彻底等问题。
-
-## Example: base function
+## Examples
+###  base function
+本代码演示了三个基本功能：
+1. 消息订阅、消费
+2. 崩溃隔离
+3. 等待消费完成的关闭
 ```golang
 type CountMessage struct {
 	Num int
@@ -80,9 +93,13 @@ func main() {
 	eb.StopGracefull()
 }
 ```
-## Example：filter
+### topic message filter 
+以下代码演示了针对某个具体Topic添加filter的方式，判定被除数是否为零。
+除了数据安全验证外，我们还可以通过filter：
+1. 记录日志
+2. 数据拦截及路由跳转
+3. 数据修改（游戏场景中，英雄对某方士兵加血等特效）
 ```golang
-
 type CountMessage struct {
 	X, Y int
 }
@@ -150,4 +167,7 @@ func main() {
 
 ```
 
->more examples,can see dir example
+### [more examples][1]
+                       
+                       
+[1]: https://github.com/alex023/eventbus/tree/dev/example
