@@ -26,7 +26,7 @@ func (c *Consumer) Count(message interface{}) {
 	}
 }
 
-//此代码演示多消费者处理数据，系统的性能！
+//此代码演示多消费者处理数据时的系统吞吐量！
 func main() {
 	//init [topic_num]topic,and arrange [consumer_num] consumer per topic。
 	//send to [message_num] messages to every topic,should get 10*[message_num] messages。

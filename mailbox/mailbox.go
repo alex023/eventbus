@@ -15,7 +15,6 @@ const (
 type Mailbox interface {
 	PostUserMessage(message interface{})
 	PostCmdMessage(message interface{})
-	Start()
 }
 
 type defaultMailbox struct {
@@ -48,6 +47,7 @@ func (mailbox *defaultMailbox) schedule() {
 func (mailbox *defaultMailbox) processMsg() {
 process_start:
 	mailbox.run()
+
 	atomic.StoreInt32(&mailbox.scheduleStatus, _IDLE)
 
 	// check if there are still messages to process (sent after the message loop ended)
@@ -63,7 +63,7 @@ func (mailbox *defaultMailbox) run() {
 	var msg interface{}
 	defer func() {
 		if err := recover(); err != nil {
-			fmt.Println("[EventBus] Recovering", "instance is ", mailbox.invoker, "Reson:", err)
+			fmt.Println("[EventBus] Recovering", "msg is ", msg, "Reson:", err)
 		}
 	}()
 
@@ -91,9 +91,7 @@ func (mailbox *defaultMailbox) run() {
 	}
 
 }
-func (mailbox *defaultMailbox) Start() {
 
-}
 func New(size uint64, invoker Invoker, dispatcher Dispatcher) Mailbox {
 	return &defaultMailbox{
 		userMessage: boundQueue(size),
