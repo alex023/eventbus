@@ -65,5 +65,5 @@ func main() {
 
 		}
 	}
-	time.Sleep(time.Second)
+	eb.StopGracefull()
 }
