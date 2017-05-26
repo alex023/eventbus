@@ -50,24 +50,28 @@ func (c *Consumer) Div(message interface{}) {
 func main() {
 	var (
 		r        = rand.New(rand.NewSource(time.Now().UnixNano()))
-		eb       = eventbus.New()
+		monitor  = eventbus.NewDefaultStatistics()
+		eb       = eventbus.New().WithStatistics(monitor)
 		consumer = &Consumer{}
+		topic    = "T"
 	)
 
-	eb.Subscribe("add", consumer.Div)
-	eb.LoadFilter("add", &DivisorJudgment{})
+	eb.Subscribe(topic, consumer.Div)
+	eb.LoadFilter(topic, &DivisorJudgment{})
 
 	fmt.Println("catch zero divisor by filter.")
 
 	//0...49,catch zero divisor by [watcher];and 50...99,no watcher.
 	for i := 0; i < 100; i++ {
-		eb.Push("add", CountMessage{i, r.Intn(5)})
+		eb.Push(topic, CountMessage{i, r.Intn(5)})
 		time.Sleep(time.Millisecond * 100)
 		if i == 50 {
 			fmt.Println("recover collapse by eventbus.")
-			eb.UnloadFilter("add", &DivisorJudgment{})
+			eb.UnloadFilter(topic, &DivisorJudgment{})
 
 		}
 	}
 	eb.StopGracefull()
+	fmt.Printf("%+v", monitor.Topics())
+
 }
