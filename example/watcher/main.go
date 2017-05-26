@@ -11,21 +11,21 @@ type CountMessage struct {
 	X, Y int
 }
 
-//DivisorJudgment implement struct of "Filter"
+//DivisorJudgment implement struct of "Watcher"
 type DivisorJudgment struct {
 }
 
-func (m *DivisorJudgment) Receive(message interface{}) (newMsg interface{}, proceed bool) {
+func (m *DivisorJudgment) Receive(message interface{}) (proceed bool) {
 	msg, ok := message.(CountMessage)
 	if !ok {
-		return nil, false
+		return false
 	}
 	//determines whether the divisor is zero。if it's ,catch it.
 	if msg.Y == 0 {
-		fmt.Printf("[Filter] [X/Y]:[%2d/%2d]= ,zero the dividend \n", msg.X, msg.Y)
-		return nil, false
+		fmt.Printf("[Watcher] [X/Y]:[%2d/%2d]= ,zero the dividend \n", msg.X, msg.Y)
+		return false
 	}
-	return msg, true
+	return true
 }
 
 type Consumer struct {
@@ -59,7 +59,7 @@ func main() {
 
 	fmt.Println("catch zero divisor by filter.")
 
-	//0...49,catch zero divisor by [filter];and 50...99,no filter.
+	//0...49,catch zero divisor by [watcher];and 50...99,no watcher.
 	for i := 0; i < 100; i++ {
 		eb.Push("add", CountMessage{i, r.Intn(5)})
 		time.Sleep(time.Millisecond * 100)

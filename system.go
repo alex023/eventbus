@@ -31,11 +31,11 @@ func (sub *Subscribe) Unscribe() {
 
 type cmdLoadFilter struct {
 	topic  string
-	filter Filter
+	filter Watcher
 }
 type cmdUnloadFilter struct {
 	topic  string
-	filter Filter
+	filter Watcher
 }
 type cmdAddConsumer struct {
 	topic       string
@@ -131,7 +131,7 @@ func (s *Bus) Push(topicName string, message interface{}) error {
 	return nil
 }
 
-func (s *Bus) LoadFilter(topic string, filter Filter) error {
+func (s *Bus) LoadFilter(topic string, filter Watcher) error {
 	if atomic.LoadInt32(&s.stopFlag) == _CLOSED {
 		return ErrClosed
 	}
@@ -150,7 +150,7 @@ func (s *Bus) LoadFilter(topic string, filter Filter) error {
 	return nil
 }
 
-func (s *Bus) UnloadFilter(topic string, filter Filter) error {
+func (s *Bus) UnloadFilter(topic string, filter Watcher) error {
 	if atomic.LoadInt32(&s.stopFlag) == _CLOSED {
 		return ErrClosed
 	}

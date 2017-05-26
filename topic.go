@@ -11,7 +11,7 @@ import (
 type Topic struct {
 	Name      string
 	mailbox   mailbox.Mailbox
-	filters   map[Filter]bool
+	filters   map[Watcher]bool
 	consumers map[uint64]CallFunc
 	msgCount  uint64
 	closeFlag int32
@@ -21,7 +21,7 @@ type Topic struct {
 func NewTopic(topicName string) *Topic {
 	topic := &Topic{
 		Name:      topicName,
-		filters:   make(map[Filter]bool),
+		filters:   make(map[Watcher]bool),
 		consumers: make(map[uint64]CallFunc),
 	}
 	topic.mailbox = mailbox.New(1000, topic, mailbox.NewDispatcher(5))
@@ -79,7 +79,7 @@ func (topic *Topic) ReceiveUserMessage(message interface{}) {
 
 	var proceed bool
 	for filter, _ := range topic.filters {
-		if message, proceed = filter.Receive(message); !proceed {
+		if proceed = filter.Receive(message); !proceed {
 			return
 		}
 	}
@@ -114,7 +114,7 @@ func (topic *Topic) Close() {
 	}
 }
 func (topic *Topic) clean() {
-	//release filter & consumer
+	//release watcher & consumer
 	//todo:should nil after delete?
 	for filter, _ := range topic.filters {
 		delete(topic.filters, filter)
