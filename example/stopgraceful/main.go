@@ -30,8 +30,8 @@ func stop() {
 	consumer := &SlowActor{}
 
 	eb.Subscribe("sleep", consumer.Action)
-	eb.Publish("sleep", struct{}{})
-	eb.Publish("sleep", struct{}{})
+	eb.Push("sleep", struct{}{})
+	eb.Push("sleep", struct{}{})
 	eb.Stop()
 }
 
@@ -41,7 +41,7 @@ func stopGraceful() {
 	consumer := &SlowActor{}
 
 	eb.Subscribe("sleep", consumer.Action)
-	eb.Publish("sleep", struct{}{})
-	eb.Publish("sleep", struct{}{})
+	eb.Push("sleep", struct{}{})
+	eb.Push("sleep", struct{}{})
 	eb.StopGracefull()
 }

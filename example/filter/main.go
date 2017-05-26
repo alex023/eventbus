@@ -61,7 +61,7 @@ func main() {
 
 	//0...49,catch zero divisor by [filter];and 50...99,no filter.
 	for i := 0; i < 100; i++ {
-		eb.Publish("add", CountMessage{i, r.Intn(5)})
+		eb.Push("add", CountMessage{i, r.Intn(5)})
 		time.Sleep(time.Millisecond * 100)
 		if i == 50 {
 			fmt.Println("recover collapse by eventbus.")

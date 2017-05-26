@@ -56,7 +56,7 @@ func main() {
 	start := time.Now()
 	//transmit ADD (by struct{}{}) signal
 	for i := 0; i < message_num; i++ {
-		if err := eb.Publish("subj"+strconv.Itoa(r.Intn(topic_num)), struct{}{}); err != nil {
+		if err := eb.Push("subj"+strconv.Itoa(r.Intn(topic_num)), struct{}{}); err != nil {
 			fmt.Println("publish err:", err)
 			break
 		}
@@ -64,7 +64,7 @@ func main() {
 	//transmit EXIT (by ResultChan) signal
 	for i := 0; i < topic_num; i++ {
 		//NOTE:if transmit EXIT signal by other topic,it can be received before ADD ,and get uncorrect result
-		eb.Publish("subj"+strconv.Itoa(i), resultChan)
+		eb.Push("subj"+strconv.Itoa(i), resultChan)
 	}
 	var count = 0
 	t := time.After(time.Second * 1)

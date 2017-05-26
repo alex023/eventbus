@@ -113,8 +113,8 @@ func (s *Bus) unsubscribe(topicName string, id uint64) error {
 	return nil
 }
 
-// PostUserMessage asynchronous push a messageEnvelop
-func (s *Bus) Publish(topicName string, message interface{}) error {
+// Push  push a message to topic mailbox
+func (s *Bus) Push(topicName string, message interface{}) error {
 	if atomic.LoadInt32(&s.stopFlag) == _CLOSED {
 		return ErrClosed
 	}

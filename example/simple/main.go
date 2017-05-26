@@ -53,7 +53,7 @@ func main() {
 	time.Sleep(time.Second)
 	for i := 0; i < 10; i++ {
 		time.Sleep(time.Millisecond * 500)
-		eb.Publish(topic, CountMessage{i})
+		eb.Push(topic, CountMessage{i})
 	}
 
 	time.Sleep(time.Second)
@@ -61,7 +61,7 @@ func main() {
 	//those messages cannot received by consumer,because it unsubscribe this topic
 	for i := 10; i < 20; i++ {
 		time.Sleep(time.Millisecond * 200)
-		eb.Publish(topic, CountMessage{i})
+		eb.Push(topic, CountMessage{i})
 	}
 
 	eb.StopGracefull()
