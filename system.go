@@ -31,11 +31,11 @@ func (sub *Subscribe) Unscribe() {
 
 type cmdLoadFilter struct {
 	topic  string
-	filter Watcher
+	filter Filter
 }
 type cmdUnloadFilter struct {
 	topic  string
-	filter Watcher
+	filter Filter
 }
 type cmdAddConsumer struct {
 	topic       string
@@ -59,18 +59,15 @@ type Bus struct {
 	topics      map[string]*Topic //map[topic.Name]*Channel
 	consumerSeq uint64
 	stopFlag    int32
-	state       Statistics
+	state       *Statistics
 }
 
 // New create a eventbus
 func New() *Bus {
 	bus := &Bus{
 		topics: make(map[string]*Topic),
+		state:  boundStatistics(),
 	}
-	return bus
-}
-func (bus *Bus) WithStatistics(statistics Statistics) *Bus {
-	bus.state = statistics
 	return bus
 }
 
@@ -147,7 +144,7 @@ func (bus *Bus) Push(topicName string, message interface{}) error {
 	return nil
 }
 
-func (bus *Bus) LoadFilter(topic string, filter Watcher) error {
+func (bus *Bus) LoadFilter(topic string, filter Filter) error {
 	if atomic.LoadInt32(&bus.stopFlag) == _CLOSED {
 		return ErrClosed
 	}
@@ -166,7 +163,7 @@ func (bus *Bus) LoadFilter(topic string, filter Watcher) error {
 	return nil
 }
 
-func (bus *Bus) UnloadFilter(topic string, filter Watcher) error {
+func (bus *Bus) UnloadFilter(topic string, filter Filter) error {
 	if atomic.LoadInt32(&bus.stopFlag) == _CLOSED {
 		return ErrClosed
 	}
@@ -200,7 +197,7 @@ func (bus *Bus) Stop() {
 }
 
 //StopGracefull block for stoping eventbus until all messages are received by the consumer
-func (bus Bus) StopGracefull() {
+func (bus *Bus) StopGracefull() {
 	if atomic.CompareAndSwapInt32(&bus.stopFlag, _RUNNING, _CLOSED) {
 		wg := &sync.WaitGroup{}
 		wg.Add(len(bus.topics))
@@ -212,4 +209,8 @@ func (bus Bus) StopGracefull() {
 		}
 		wg.Wait()
 	}
+}
+
+func (bus *Bus) Topics() map[string]TopicInfo {
+	return bus.state.Topics()
 }

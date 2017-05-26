@@ -11,18 +11,18 @@ type CountMessage struct {
 	X, Y int
 }
 
-//DivisorJudgment implement struct of "Watcher"
+//DivisorJudgment implement struct of "Filter"
 type DivisorJudgment struct {
 }
 
-func (m *DivisorJudgment) Receive(message interface{}) (proceed bool) {
+func (m *DivisorJudgment) HandleMessage(message interface{}) (proceed bool) {
 	msg, ok := message.(CountMessage)
 	if !ok {
 		return false
 	}
 	//determines whether the divisor is zero。if it's ,catch it.
 	if msg.Y == 0 {
-		fmt.Printf("[Watcher] [X/Y]:[%2d/%2d]= ,zero the dividend \n", msg.X, msg.Y)
+		fmt.Printf("[Filter] [X/Y]:[%2d/%2d]= ,zero the dividend \n", msg.X, msg.Y)
 		return false
 	}
 	return true
@@ -50,8 +50,7 @@ func (c *Consumer) Div(message interface{}) {
 func main() {
 	var (
 		r        = rand.New(rand.NewSource(time.Now().UnixNano()))
-		monitor  = eventbus.NewDefaultStatistics()
-		eb       = eventbus.New().WithStatistics(monitor)
+		eb       = eventbus.New()
 		consumer = &Consumer{}
 		topic    = "T"
 	)
@@ -72,6 +71,6 @@ func main() {
 		}
 	}
 	eb.StopGracefull()
-	fmt.Printf("%+v", monitor.Topics())
+	fmt.Printf("%+v", eb.Topics())
 
 }

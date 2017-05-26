@@ -22,7 +22,7 @@ Eventbus is an enhanced version of the standalone pub-sub asynchronous messaging
     - 允许消费者向自己推送消息。
     - 推送快于消费时，具备一定的韧性。
 - 隔离业务崩溃
-- 主题插件支持，以拦截、路由、记录、修改某个主题接受到的消息，并可以：
+- 主题插件支持，以拦截、路由、记录某个主题接受到的消息，并可以：
     - 任意时间添加或卸载（优先于一般消息）
     - [todo]实现消息接受、完成的动态监控
 

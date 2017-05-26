@@ -11,7 +11,7 @@ import (
 type Topic struct {
 	Name      string
 	mailbox   mailbox.Mailbox
-	filters   map[Watcher]bool
+	filters   map[Filter]bool
 	consumers map[uint64]CallFunc
 	msgCount  uint64
 	closeFlag int32
@@ -21,7 +21,7 @@ type Topic struct {
 func NewTopic(topicName string) *Topic {
 	topic := &Topic{
 		Name:      topicName,
-		filters:   make(map[Watcher]bool),
+		filters:   make(map[Filter]bool),
 		consumers: make(map[uint64]CallFunc),
 	}
 	topic.mailbox = mailbox.New(1000, topic, mailbox.NewDispatcher(5))
@@ -77,13 +77,15 @@ func (topic *Topic) ReceiveUserMessage(message interface{}) {
 		return
 	}
 
-	var proceed bool
+	var proceed = true
 	for filter, _ := range topic.filters {
-		if proceed = filter.Receive(message); !proceed {
-			return
+		if proceed = filter.HandleMessage(message); !proceed {
+			proceed = false
 		}
 	}
-	topic.notifyConsumer(message)
+	if proceed {
+		topic.notifyConsumer(message)
+	}
 }
 
 func (topic *Topic) ReceiveCmdMessage(message interface{}) {
@@ -101,7 +103,6 @@ func (topic *Topic) ReceiveCmdMessage(message interface{}) {
 		msg.wg.Done()
 	case cmdStopGracefull:
 		topic.PostUserMessage(msg)
-		//topic.Close()
 	default:
 		fmt.Printf("[topic %v] receive undefined msg type:%v!\n", topic.Name, reflect.TypeOf(msg))
 	}
@@ -115,7 +116,7 @@ func (topic *Topic) Close() {
 }
 func (topic *Topic) clean() {
 	//release watcher & consumer
-	//todo:should nil after delete?
+	//todo:should set nil after delete?
 	for filter, _ := range topic.filters {
 		delete(topic.filters, filter)
 	}
