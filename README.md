@@ -8,7 +8,7 @@ Eventbus is an enhanced version of the standalone pub-sub asynchronous messaging
 [![Coverage Status](https://coveralls.io/repos/github/alex023/eventbus/badge.svg?branch=dev)](https://coveralls.io/github/alex023/eventbus?branch=dev)
 
 ## Brief
-消息系统在业务系统中，能够减少对象依赖，避免因为过多聚集、关联带来的维护困难等问题。但传统的[publish Msg --> Call Consumers Handle]的同步方式，会有以下个别限制：
+消息系统在业务系统中，能够减少对象依赖，避免因为过多聚集、关联带来的维护困难等问题。但传统的[push Msg --> Call Consumers Handle]的同步方式，会有以下个别限制：
 - 当消费慢于推送，可能会阻塞等待。
 - 消费者无法向包含了自身对象（或方法）的主题推送消息。
 - 消费者基于消息更改自身的订阅状态时，可能死锁。
@@ -17,14 +17,17 @@ Eventbus is an enhanced version of the standalone pub-sub asynchronous messaging
 
 面对这些问题，eventbus 基于actor的异步思想，来处理以上问题，除了最基本的消息推送、订阅功能支持之外，
  也适用于简单的ECS应用场景。具有以下特征：
-- 消息的发布与消费隔离，且有缓冲，因此支持：
+- 消息的推送与消费隔离，且有缓冲，因此支持：
     - 消息发布更快，不用等待消费者执行
-    - 允许消费者向自己发布消息。
+    - 允许消费者向自己推送消息。
     - 推送快于消费时，具备一定的韧性。
 - 隔离业务崩溃
 - 主题插件支持，以拦截、路由、记录、修改某个主题接受到的消息，并可以：
     - 任意时间添加或卸载（优先于一般消息）
     - [todo]实现消息接受、完成的动态监控
+
+## Can I use it?
+ The implementation is still in beta, we are using it for our production already. But the API change will be happen until 1.0.
 
 ## Examples
 ###  base function
