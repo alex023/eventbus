@@ -13,10 +13,10 @@ Eventbus is  event framework for in-memory event management.
 - Asynchronous event dispatching
 - Filter support:enable log 、intercept、monitor messages.
 - [todo]Multicasting events
-- [todo]Stat monitor:enable monitor the topic statistic.
-- [todo]Topic matchers:enable a subscriber (and a vetoers) to subscribe to many topics
+- [todo]State monitor:enable monitor the topic statistic.
+- [todo]Topic matchers:enable a subscriber to subscribe many topics
 
-## Just Thee Steps
+## Just Three Steps
 1. define events
 ```golang
 type message struct { /* Additional fields if needed */ }
