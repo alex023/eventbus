@@ -15,21 +15,28 @@ type Topic struct {
 	consumers map[uint64]CallFunc
 	msgCount  uint64
 	closeFlag int32
+	state     Statistics
 }
 
 // NewTopic topic constructor
-func NewTopic(topicName string) *Topic {
+func NewTopic(topicName string, statitic Statistics) *Topic {
 	topic := &Topic{
 		Name:      topicName,
 		filters:   make(map[Filter]bool),
 		consumers: make(map[uint64]CallFunc),
+		state:     statitic,
+	}
+	if topic.state == nil {
+		topic.state = boundStatistics()
 	}
 	topic.mailbox = mailbox.New(1000, topic, mailbox.NewDispatcher(5))
+
 	return topic
 }
 
 func (topic *Topic) addConsumer(consumerSeq uint64, handler CallFunc) {
 	topic.consumers[consumerSeq] = handler
+	topic.state.TopicSubscribe()
 }
 
 //rmConsumer remove callback function by assigned clientid
@@ -41,6 +48,7 @@ func (topic *Topic) rmConsumer(consumerSeq uint64) int {
 			ret--
 		}
 	}
+	topic.state.TopicUnscribe()
 	return ret
 }
 func (topic *Topic) PostCmdMessage(message interface{}) {
@@ -56,6 +64,7 @@ func (topic *Topic) PostUserMessage(message interface{}) {
 	}
 
 	topic.mailbox.PostUserMessage(message)
+	topic.state.MessagePushed(message)
 }
 
 //notifyConsumer 向订阅了Topic的client发送消息
@@ -86,14 +95,17 @@ func (topic *Topic) ReceiveUserMessage(message interface{}) {
 	if proceed {
 		topic.notifyConsumer(message)
 	}
+	topic.state.MessageReceived(message)
 }
 
 func (topic *Topic) ReceiveCmdMessage(message interface{}) {
 	switch msg := message.(type) {
 	case cmdLoadFilter:
 		topic.filters[msg.filter] = true
+		topic.state.FilterLoad()
 	case cmdUnloadFilter:
 		delete(topic.filters, msg.filter)
+		topic.state.FilterUnload()
 	case cmdAddConsumer:
 		topic.addConsumer(msg.consumerSeq, msg.callFn)
 	case cmdRmConsumer:
@@ -126,4 +138,7 @@ func (topic *Topic) clean() {
 		delete(topic.consumers, id)
 	}
 	topic.consumers = nil
+}
+func (topic *Topic) Info() Statistics {
+	return topic.state
 }

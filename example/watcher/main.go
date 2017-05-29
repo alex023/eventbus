@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/alex023/eventbus"
 	"math/rand"
+	"sync/atomic"
 	"time"
 )
 
@@ -46,6 +47,37 @@ func (c *Consumer) Div(message interface{}) {
 	}
 }
 
+type Watcher struct {
+	name            string
+	subscribeNum    int64
+	messageReceived uint64
+	messagePushed   uint64
+	filterNum       int64
+}
+
+func (ds *Watcher) SetTopicName(topicName string) {
+	ds.name = topicName
+}
+func (ds *Watcher) TopicSubscribe() {
+	atomic.AddInt64(&ds.subscribeNum, 1)
+}
+func (ds *Watcher) TopicUnscribe() {
+	atomic.AddInt64(&ds.subscribeNum, -1)
+}
+func (ds *Watcher) FilterLoad() {
+	atomic.AddInt64(&ds.filterNum, 1)
+}
+func (ds *Watcher) FilterUnload() {
+	atomic.AddInt64(&ds.filterNum, -1)
+}
+func (ds *Watcher) MessagePushed(message interface{}) {
+	atomic.AddUint64(&ds.messagePushed, 1)
+}
+
+func (ds *Watcher) MessageReceived(message interface{}) {
+	atomic.AddUint64(&ds.messageReceived, 1)
+}
+
 //此代码演插件对消息的处理，如何影响消息！
 func main() {
 	var (
@@ -54,7 +86,7 @@ func main() {
 		consumer = &Consumer{}
 		topic    = "T"
 	)
-
+	eb.InitTopic(topic, &Watcher{})
 	eb.Subscribe(topic, consumer.Div)
 	eb.LoadFilter(topic, &DivisorJudgment{})
 
@@ -63,14 +95,15 @@ func main() {
 	//0...49,catch zero divisor by [watcher];and 50...99,no watcher.
 	for i := 0; i < 100; i++ {
 		eb.Push(topic, CountMessage{i, r.Intn(5)})
-		time.Sleep(time.Millisecond * 100)
+		time.Sleep(time.Millisecond * 50)
 		if i == 50 {
+			fmt.Printf("[topic statics]:%+v \n", eb.Statistic(topic)[0])
+
 			fmt.Println("recover collapse by eventbus.")
 			eb.UnloadFilter(topic, &DivisorJudgment{})
-
 		}
 	}
 	eb.StopGracefull()
-	fmt.Printf("%+v", eb.Topics())
+	fmt.Printf("[topic statics]:%+v \n", eb.Statistic(topic)[0])
 
 }

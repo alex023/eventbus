@@ -14,6 +14,7 @@ const (
 
 var (
 	ErrUnvaliableTopic = errors.New("topic unvaliable.")
+	ErrDuplicateTopic  = errors.New("topic duplicated.")
 	ErrClosed          = errors.New("eventbus closed.")
 )
 
@@ -61,19 +62,17 @@ type Bus struct {
 	topics      map[string]*Topic //map[topic.Name]*Channel
 	consumerSeq uint64
 	stopFlag    int32
-	state       *Statistics
 }
 
 // New create a eventbus
 func New() *Bus {
 	bus := &Bus{
 		topics: make(map[string]*Topic),
-		state:  boundStatistics(),
 	}
 	return bus
 }
 
-//Subscribe 订阅主题，要确保输入的clientId唯一，避免不同客户端注册的时候采用同样的ClientId，否则会被替换。
+//Subscribe 订阅主题。
 func (bus *Bus) Subscribe(topicName string, handle CallFunc) (*Subscribe, error) {
 	if atomic.LoadInt32(&bus.stopFlag) == _CLOSED {
 		return nil, ErrClosed
@@ -83,7 +82,7 @@ func (bus *Bus) Subscribe(topicName string, handle CallFunc) (*Subscribe, error)
 	ch, found := bus.topics[topicName]
 	bus.rwmut.RUnlock()
 	if !found {
-		ch = NewTopic(topicName)
+		ch = NewTopic(topicName, nil)
 		bus.rwmut.Lock()
 		bus.topics[topicName] = ch
 		bus.rwmut.Unlock()
@@ -96,11 +95,27 @@ func (bus *Bus) Subscribe(topicName string, handle CallFunc) (*Subscribe, error)
 	}
 	ch.PostCmdMessage(msg)
 
-	if bus.state != nil {
-		bus.state.TopicSubscribe(topicName)
+	return &Subscribe{topic: topicName, id: seq, bus: bus}, nil
+}
+
+//InitTopic use this method to set statics before Subscribe if we need to set
+func (bus *Bus) InitTopic(topicName string, statics Statistics) error {
+	if atomic.LoadInt32(&bus.stopFlag) == _CLOSED {
+		return ErrClosed
 	}
 
-	return &Subscribe{topic: topicName, id: seq, bus: bus}, nil
+	bus.rwmut.RLock()
+	ch, found := bus.topics[topicName]
+	bus.rwmut.RUnlock()
+	if !found {
+		ch = NewTopic(topicName, statics)
+		bus.rwmut.Lock()
+		bus.topics[topicName] = ch
+		bus.rwmut.Unlock()
+	} else {
+		return ErrDuplicateTopic
+	}
+	return nil
 }
 
 //unsubscribe 取消订阅。
@@ -119,9 +134,6 @@ func (bus *Bus) unsubscribe(topicName string, id uint64) error {
 	}
 	ch.PostCmdMessage(msg)
 
-	if bus.state != nil {
-		bus.state.TopicUnscribe(topicName)
-	}
 	return nil
 }
 
@@ -140,9 +152,6 @@ func (bus *Bus) Push(topicName string, message interface{}) error {
 
 	ch.PostUserMessage(message)
 
-	if bus.state != nil {
-		bus.state.MessagePushed(topicName, message)
-	}
 	return nil
 }
 
@@ -213,6 +222,14 @@ func (bus *Bus) StopGracefull() {
 	}
 }
 
-func (bus *Bus) Topics() map[string]TopicInfo {
-	return bus.state.Topics()
+func (bus *Bus) Statistic(names ...string) []Statistics {
+	var result []Statistics
+	bus.rwmut.RLock()
+	defer bus.rwmut.RUnlock()
+	for _, topicname := range names {
+		if topic, founded := bus.topics[topicname]; founded {
+			result = append(result, topic.state)
+		}
+	}
+	return result
 }

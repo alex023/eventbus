@@ -16,7 +16,7 @@ func (q *Queue) Pop() interface{} {
 	return nil
 }
 
-func (q *Queue) Push(item interface{}) {
+func (q *Queue) Post(item interface{}) {
 	q.queue.Put(item)
 }
 
