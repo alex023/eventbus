@@ -53,6 +53,8 @@ type cmdStopGracefull struct {
 	wg *sync.WaitGroup
 }
 
+var Default = New()
+
 // Bus is a  subscription service module
 type Bus struct {
 	rwmut       sync.RWMutex

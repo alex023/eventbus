@@ -1,5 +1,5 @@
 # eventbus
-Eventbus is an enhanced version of the standalone pub-sub asynchronous messaging framework.
+[**中文介绍**](https://github.com/alex023/eventbus/wiki)  
 
 [![License](https://img.shields.io/:license-apache-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Report Card](https://goreportcard.com/badge/github.com/alex023/eventbus)](https://goreportcard.com/report/github.com/alex023/eventbus)
@@ -8,33 +8,44 @@ Eventbus is an enhanced version of the standalone pub-sub asynchronous messaging
 [![Coverage Status](https://coveralls.io/repos/github/alex023/eventbus/badge.svg?branch=dev)](https://coveralls.io/github/alex023/eventbus?branch=dev)
 
 ## Brief
-消息系统在业务系统中，能够减少对象依赖，避免因为过多聚集、关联带来的维护困难等问题。但传统的[push Msg --> Call Consumers Handle]的同步方式，会有以下个别限制：
-- 当消费慢于推送，可能会阻塞等待。
-- 消费者无法向包含了自身对象（或方法）的主题推送消息。
-- 消费者基于消息更改自身的订阅状态时，可能死锁。
-- 在消费者获取消息前，无法进行消息预处理。
-- ……
+Eventbus is  event framework for in-memory event management. 
+- Fault isolation
+- Asynchronous event dispatching
+- Filter support:enable log 、intercept、monitor messages.
+- [todo]Multicasting events
+- [todo]Stat monitor:enable monitor the topic statistic.
+- [todo]Topic matchers:enable a subscriber (and a vetoers) to subscribe to many topics
 
-面对这些问题，eventbus 基于actor的异步思想，来处理以上问题，除了最基本的消息推送、订阅功能支持之外，
- 也适用于简单的ECS应用场景。具有以下特征：
-- 消息的推送与消费隔离，且有缓冲，因此支持：
-    - 消息发布更快，不用等待消费者执行
-    - 允许消费者向自己推送消息。
-    - 推送快于消费时，具备一定的韧性。
-- 隔离业务崩溃
-- 主题插件支持，以拦截、路由、记录某个主题接受到的消息，并可以：
-    - 任意时间添加或卸载（优先于一般消息）
-    - [todo]实现消息接受、完成的动态监控
+## Just Thee Steps
+1. define events
+```golang
+type message struct { /* Additional fields if needed */ }
+```
+We can ignore this step if basic type ,such as string、int、uint etc.. 
+2. Prepare subscribers: Declare  your subscribing method without Mutex for multithreading,
+```golang
+//we can use any method name to  handle event 
+func  HandleMsg(msg interface{}) {/* Do something */};
 
+//...
+func main(){
+    eventbus.Default.Subscribe("topic",HandleMsg)
+    //...
+}
+```
+3. Push events
+```golang
+eventbus.Default.Push("topic",this is test msg!")
+```
 ## Can I use it?
  The implementation is still in beta, we are using it for our production already. But the API change will be happen until 1.0.
 
 ## Examples
 ###  base function
-本代码演示了三个基本功能：
-1. 消息订阅、消费
-2. 崩溃隔离
-3. 等待消费完成的关闭
+this code show eventbus basic function：
+1. fault isolation
+2. the subscription object itself is unsubscribed
+3. eventbus stop gracefull
 ```golang
 type CountMessage struct {
 	Num int
@@ -66,7 +77,7 @@ func (c *Consumer) HandleMessage(message interface{}) {
 	}
 }
 
-//此代码演示消费者订阅的基本功能：
+//this code show eventbus basic func此代码演示消费者订阅的基本功能：
 // 1.fault isolation
 // 2.the subscription object itself is unsubscribed
 // 3.eventbus stop gracefull
@@ -98,11 +109,7 @@ func main() {
 }
 ```
 ### topic message filter 
-以下代码演示了针对某个具体Topic添加filter的方式，判定被除数是否为零。
-除了数据安全验证外，我们还可以通过filter：
-1. 记录日志
-2. 数据拦截及路由跳转
-3. 数据修改（游戏场景中，英雄对某方士兵加血等特效）
+this code show how to use filter。therefor,we can log 、intercept、monitor etc with filter. 
 ```golang
 type CountMessage struct {
 	X, Y int
@@ -143,7 +150,7 @@ func (c *Consumer) Div(message interface{}) {
 	}
 }
 
-//此代码演插件对消息的处理，如何影响消息！
+//this code show how can use filter to intercept message！
 func main() {
 	var (
 		r        = rand.New(rand.NewSource(time.Now().UnixNano()))
