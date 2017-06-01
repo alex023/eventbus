@@ -36,7 +36,7 @@ func main() {
 		topic_num    = 1000
 		consumer_num = 10
 	)
-	eb := eventbus.New()
+	eb := eventbus.Default
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	resultChan := ResultChan{
 		signal: make(chan int, topic_num),

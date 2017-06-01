@@ -28,13 +28,13 @@ type defaultMailbox struct {
 }
 
 func (mailbox *defaultMailbox) PostCmdMessage(message interface{}) {
-	mailbox.cmdMessage.Push(message)
+	mailbox.cmdMessage.Post(message)
 	atomic.AddInt32(&mailbox.cmdMessages, 1)
 	mailbox.schedule()
 }
 
 func (mailbox *defaultMailbox) PostUserMessage(message interface{}) {
-	mailbox.userMessage.Push(message)
+	mailbox.userMessage.Post(message)
 	atomic.AddInt32(&mailbox.userMessages, 1)
 	mailbox.schedule()
 }

@@ -20,7 +20,7 @@ type producer struct {
 
 func (p *producer) Action(times int) {
 	for i := 0; i < times; i++ {
-		p.queue.Push(struct{}{})
+		p.queue.Post(struct{}{})
 		p.count++
 	}
 }
