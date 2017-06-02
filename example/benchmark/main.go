@@ -36,7 +36,7 @@ func main() {
 		topic_num    = 1000
 		consumer_num = 10
 	)
-	eb := eventbus.Default
+	eb := eventbus.Default()
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	resultChan := ResultChan{
 		signal: make(chan int, topic_num),
@@ -48,7 +48,7 @@ func main() {
 			consumer := Consumer{
 				ID: strconv.Itoa(i) + strconv.Itoa(j),
 			}
-			eb.Subscribe("subj"+strconv.Itoa(i), consumer.Count)
+			eb.Subscribe(consumer.Count, "subj"+strconv.Itoa(i))
 		}
 	}
 	fmt.Printf("sending  %vw messages begin.......\n", message_num/10000)

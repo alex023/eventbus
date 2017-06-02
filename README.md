@@ -83,11 +83,11 @@ func (c *Consumer) HandleMessage(message interface{}) {
 // 3.eventbus stop gracefull
 func main() {
 	var (
-		eb    = eventbus.New()
+		eb    = eventbus.Default()
 		topic = "add"
 	)
 	consumer := &Consumer{}
-	sub, _ := eb.Subscribe(topic, consumer.HandleMessage)
+	sub, _ := eb.Subscribe(consumer.HandleMessage,topic)
 	consumer.sub = sub
 
 	fmt.Println("send 10 messages, Num from 0 to 9")
@@ -156,24 +156,27 @@ func main() {
 		r        = rand.New(rand.NewSource(time.Now().UnixNano()))
 		eb       = eventbus.New()
 		consumer = &Consumer{}
+		topic    = "T"
 	)
-
-	eb.Subscribe("add", consumer.Div)
-	eb.LoadFilter("add", &DivisorJudgment{})
+	eb.InitTopic(topic, &Watcher{})
+	eb.Subscribe(consumer.Div, topic)
+	eb.LoadFilter(topic, &DivisorJudgment{})
 
 	fmt.Println("catch zero divisor by filter.")
 
-	//0...49,catch zero divisor by [filter];and 50...99,no filter.
+	//0...49,catch zero divisor by [watcher];and 50...99,no watcher.
 	for i := 0; i < 100; i++ {
-		eb.Publish("add", CountMessage{i, r.Intn(5)})
-		time.Sleep(time.Millisecond * 100)
+		eb.Push(topic, CountMessage{i, r.Intn(5)})
+		time.Sleep(time.Millisecond * 50)
 		if i == 50 {
-			fmt.Println("recover collapse by eventbus.")
-			eb.UnloadFilter("add", &DivisorJudgment{})
+			fmt.Printf("[topic statics]:%+v \n", eb.Statistic(topic)[0])
 
+			fmt.Println("recover collapse by eventbus.")
+			eb.UnloadFilter(topic, &DivisorJudgment{})
 		}
 	}
 	eb.StopGracefull()
+	fmt.Printf("[topic statics]:%+v \n", eb.Statistic(topic)[0])
 }
 
 ```
