@@ -54,7 +54,12 @@ type cmdStopGracefull struct {
 	wg *sync.WaitGroup
 }
 
-var Default = New()
+var defaultBus = New()
+
+//Default get default init Bus
+func Default() *Bus {
+	return defaultBus
+}
 
 // Bus is a  subscription service module
 type Bus struct {
