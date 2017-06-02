@@ -87,7 +87,7 @@ func main() {
 		topic    = "T"
 	)
 	eb.InitTopic(topic, &Watcher{})
-	eb.Subscribe(topic, consumer.Div)
+	eb.Subscribe(consumer.Div, topic)
 	eb.LoadFilter(topic, &DivisorJudgment{})
 
 	fmt.Println("catch zero divisor by filter.")

@@ -21,13 +21,14 @@ var (
 type CallFunc func(message interface{})
 
 type Subscribe struct {
-	bus   *Bus
-	topic string
-	id    uint64
+	bus    *Bus
+	topics map[string]uint64 //topic-id
 }
 
 func (sub *Subscribe) Unscribe() {
-	sub.bus.unsubscribe(sub.topic, sub.id)
+	for topicname, id := range sub.topics {
+		sub.bus.unsubscribe(topicname, id)
+	}
 }
 
 type cmdLoadFilter struct {
@@ -54,11 +55,18 @@ type cmdStopGracefull struct {
 	wg *sync.WaitGroup
 }
 
-var defaultBus = New()
+var (
+	defaultBus *Bus
+	oncedo     sync.Once
+)
 
 //Default get default init Bus
 func Default() *Bus {
+	oncedo.Do(initDefaultBus)
 	return defaultBus
+}
+func initDefaultBus() {
+	defaultBus = New()
 }
 
 // Bus is a  subscription service module
@@ -78,29 +86,34 @@ func New() *Bus {
 }
 
 //Subscribe 订阅主题。
-func (bus *Bus) Subscribe(topicName string, handle CallFunc) (*Subscribe, error) {
+func (bus *Bus) Subscribe(handle CallFunc, topicNames ...string) (*Subscribe, error) {
+	var subscribe = &Subscribe{
+		topics: make(map[string]uint64),
+		bus:    bus,
+	}
 	if atomic.LoadInt32(&bus.stopFlag) == _CLOSED {
 		return nil, ErrClosed
 	}
-
-	bus.rwmut.RLock()
-	ch, found := bus.topics[topicName]
-	bus.rwmut.RUnlock()
-	if !found {
-		ch = NewTopic(topicName, nil)
-		bus.rwmut.Lock()
-		bus.topics[topicName] = ch
-		bus.rwmut.Unlock()
+	for _, topicname := range topicNames {
+		bus.rwmut.RLock()
+		ch, found := bus.topics[topicname]
+		bus.rwmut.RUnlock()
+		if !found {
+			ch = NewTopic(topicname, nil)
+			bus.rwmut.Lock()
+			bus.topics[topicname] = ch
+			bus.rwmut.Unlock()
+		}
+		seq := atomic.AddUint64(&bus.consumerSeq, 1)
+		msg := cmdAddConsumer{
+			topic:       topicname,
+			consumerSeq: seq,
+			callFn:      handle,
+		}
+		ch.PostCmdMessage(msg)
+		subscribe.topics[topicname] = seq
 	}
-	seq := atomic.AddUint64(&bus.consumerSeq, 1)
-	msg := cmdAddConsumer{
-		topic:       topicName,
-		consumerSeq: seq,
-		callFn:      handle,
-	}
-	ch.PostCmdMessage(msg)
-
-	return &Subscribe{topic: topicName, id: seq, bus: bus}, nil
+	return subscribe, nil
 }
 
 //InitTopic use this method to set statics before Subscribe if we need to set

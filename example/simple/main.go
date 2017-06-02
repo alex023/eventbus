@@ -42,11 +42,11 @@ func (c *Consumer) HandleMessage(message interface{}) {
 // 3.eventbus stop gracefull
 func main() {
 	var (
-		eb    = eventbus.New()
+		eb    = eventbus.Default()
 		topic = "add"
 	)
 	consumer := &Consumer{}
-	sub, _ := eb.Subscribe(topic, consumer.HandleMessage)
+	sub, _ := eb.Subscribe(consumer.HandleMessage, topic)
 	consumer.sub = sub
 
 	fmt.Println("send 10 messages, Num from 0 to 9")
