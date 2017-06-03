@@ -13,7 +13,7 @@ type CountMessage struct {
 type Consumer struct {
 	testNilMap map[int32]struct{}
 	counter    int
-	sub        *eventbus.Subscribe
+	sub        eventbus.Subscribe
 }
 
 func (c *Consumer) HandleMessage(message interface{}) {
@@ -32,7 +32,7 @@ func (c *Consumer) HandleMessage(message interface{}) {
 
 	if c.counter > 9 {
 		fmt.Println("consumer unscribe topic,and cannot receive any message later.")
-		c.sub.Unscribe()
+		c.sub.UnscribeAll()
 	}
 }
 

@@ -18,18 +18,8 @@ var (
 	ErrClosed          = errors.New("eventbus closed.")
 )
 
+//CallFunc  definition of the consumer function which eventbus call
 type CallFunc func(message interface{})
-
-type Subscribe struct {
-	bus    *Bus
-	topics map[string]uint64 //topic-id
-}
-
-func (sub *Subscribe) Unscribe() {
-	for topicname, id := range sub.topics {
-		sub.bus.unsubscribe(topicname, id)
-	}
-}
 
 type cmdLoadFilter struct {
 	topic  string
@@ -85,16 +75,24 @@ func New() *Bus {
 	return bus
 }
 
-//Subscribe 订阅主题。
-func (bus *Bus) Subscribe(handle CallFunc, topicNames ...string) (*Subscribe, error) {
-	var subscribe = &Subscribe{
-		topics: make(map[string]uint64),
-		bus:    bus,
-	}
+//Subscribe 订阅主题，并返还供客户端使用的主题应用，可用来撤销或查看订阅情况
+func (bus *Bus) Subscribe(handle CallFunc, topicNames ...string) (Subscribe, error) {
 	if atomic.LoadInt32(&bus.stopFlag) == _CLOSED {
 		return nil, ErrClosed
 	}
+
+	var subscribe = &defaultSubscribe{
+		topics: make(map[string]uint64),
+		bus:    bus,
+	}
 	for _, topicname := range topicNames {
+		seq := atomic.AddUint64(&bus.consumerSeq, 1)
+		msg := cmdAddConsumer{
+			topic:       topicname,
+			consumerSeq: seq,
+			callFn:      handle,
+		}
+
 		bus.rwmut.RLock()
 		ch, found := bus.topics[topicname]
 		bus.rwmut.RUnlock()
@@ -104,13 +102,8 @@ func (bus *Bus) Subscribe(handle CallFunc, topicNames ...string) (*Subscribe, er
 			bus.topics[topicname] = ch
 			bus.rwmut.Unlock()
 		}
-		seq := atomic.AddUint64(&bus.consumerSeq, 1)
-		msg := cmdAddConsumer{
-			topic:       topicname,
-			consumerSeq: seq,
-			callFn:      handle,
-		}
 		ch.PostCmdMessage(msg)
+
 		subscribe.topics[topicname] = seq
 	}
 	return subscribe, nil
@@ -136,8 +129,7 @@ func (bus *Bus) InitTopic(topicName string, statics Statistics) error {
 	return nil
 }
 
-//unsubscribe 取消订阅。
-//	因为采用异步消息，可以在订阅的消息handule中调用Unsubscribe来注销该主题。
+//unsubscribe remove message handler from eventbus
 func (bus *Bus) unsubscribe(topicName string, id uint64) error {
 	if atomic.LoadInt32(&bus.stopFlag) == _CLOSED {
 		return ErrClosed
