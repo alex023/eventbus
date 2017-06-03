@@ -32,7 +32,7 @@ func (c *Consumer) HandleMessage(message interface{}) {
 
 	if c.counter > 9 {
 		fmt.Println("consumer unscribe topic,and cannot receive any message later.")
-		c.sub.Unscribe()
+		c.sub.UnscribeAll()
 	}
 }
 
