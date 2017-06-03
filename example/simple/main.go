@@ -13,7 +13,7 @@ type CountMessage struct {
 type Consumer struct {
 	testNilMap map[int32]struct{}
 	counter    int
-	sub        *eventbus.Subscribe
+	sub        eventbus.Subscribe
 }
 
 func (c *Consumer) HandleMessage(message interface{}) {

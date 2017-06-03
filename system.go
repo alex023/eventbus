@@ -20,17 +20,6 @@ var (
 
 type CallFunc func(message interface{})
 
-type Subscribe struct {
-	bus    *Bus
-	topics map[string]uint64 //topic-id
-}
-
-func (sub *Subscribe) Unscribe() {
-	for topicname, id := range sub.topics {
-		sub.bus.unsubscribe(topicname, id)
-	}
-}
-
 type cmdLoadFilter struct {
 	topic  string
 	filter Filter
@@ -86,8 +75,8 @@ func New() *Bus {
 }
 
 //Subscribe 订阅主题。
-func (bus *Bus) Subscribe(handle CallFunc, topicNames ...string) (*Subscribe, error) {
-	var subscribe = &Subscribe{
+func (bus *Bus) Subscribe(handle CallFunc, topicNames ...string) (Subscribe, error) {
+	var subscribe = &defaultSubscribe{
 		topics: make(map[string]uint64),
 		bus:    bus,
 	}

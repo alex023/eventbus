@@ -183,5 +183,5 @@ func main() {
 
 ### [more examples][1]
                        
-                       
+
 [1]: https://github.com/alex023/eventbus/tree/dev/example
